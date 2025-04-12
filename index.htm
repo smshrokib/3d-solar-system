@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Solar System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        #solarSystemCanvas {
+            width: 100%;
+            height: 100vh;
+            display: block; /* Removes extra space below canvas */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="solarSystemCanvas"></canvas>
+    <script>
+        // --- Scene Setup ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('solarSystemCanvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Enable shadows for realism
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Use soft shadows
+
+        // --- Starfield ---
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsMaterial = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 1.5, sizeAttenuation: true });
+        const starVertices = [];
+        for (let i = 0; i < 10000; i++) { // More stars for better effect
+            const x = (Math.random() - 0.5) * 2000;
+            const y = (Math.random() - 0.5) * 2000;
+            const z = -Math.random() * 1000;
+            starVertices.push(x, y, z);
+        }
+        starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+        const stars = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(stars);
+
+        // --- Sun ---
+        const sunGeometry = new THREE.SphereGeometry(10, 32, 32);
+        const sunMaterial = new THREE.MeshBasicMaterial({
+            color: 0xFFFF00, // Yellow color
+            emissive: 0xFFFF00, // Make it emissive
+            emissiveIntensity: 1, // Strong glow
+        });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        sun.castShadow = false;
+        scene.add(sun);
+
+        // --- Point Light from the Sun (for potential future use with other materials) ---
+        const pointLight = new THREE.PointLight(0xFFFFFF, 2, 500); // Increased intensity and range
+        pointLight.position.set(0, 0, 0);
+        pointLight.castShadow = true;
+        pointLight.shadow.mapSize.width = 2048; // Increased shadow map size for better quality
+        pointLight.shadow.mapSize.height = 2048;
+        pointLight.shadow.camera.near = 0.1;
+        pointLight.shadow.camera.far = 1000;
+        scene.add(pointLight);
+
+        // --- Ambient Light ---
+        const ambientLight = new THREE.AmbientLight(0x404040); // Soft ambient light
+        scene.add(ambientLight);
+
+        // --- Planet Data with Textures ---
+        const textureLoader = new THREE.TextureLoader();
+        const planetsData = [
+            {
+                name: 'Mercury',
+                radius: 0.8,
+                color: 0xA9A9A9, // Dark Gray
+                distance: 20,
+                speed: 0.04,
+                tilt: 0.1,
+                rotationSpeed: 0.04,
+            },
+            {
+                name: 'Venus',
+                radius: 1.2,
+                color: 0xFFD700, // Gold
+                distance: 30,
+                speed: 0.03,
+                tilt: 0.2,
+                rotationSpeed: 0.03,
+            },
+            {
+                name: 'Earth',
+                radius: 1.4,
+                color: 0x0000FF, // Blue
+                distance: 40,
+                speed: 0.02,
+                tilt: 0.4,
+                rotationSpeed: 0.02,
+            },
+            {
+                name: 'Mars',
+                radius: 1.0,
+                color: 0xFF4500, // Orange Red
+                distance: 50,
+                speed: 0.015,
+                tilt: 0.6,
+                rotationSpeed: 0.025,
+            },
+            {
+                name: 'Jupiter',
+                radius: 4,
+                color: 0xFF8C00, // Dark Orange
+                distance: 70,
+                speed: 0.008,
+                tilt: 0.05,
+                rotationSpeed: 0.01,
+            },
+            {
+                name: 'Saturn',
+                radius: 3.5,
+                color: 0xF4A460, // Sandy Brown
+                distance: 90,
+                speed: 0.006,
+                tilt: 0.9,
+                rotationSpeed: 0.009,
+                ringRadiusInner: 5,  // Inner radius of the rings
+                ringRadiusOuter: 7,  // Outer radius of the rings
+                ringColor: 0xFFFFCC,    // Pale Yellow
+            },
+            {
+                name: 'Uranus',
+                radius: 2,
+                color: 0xAFEEEE, // Pale Turquoise
+                distance: 110,
+                speed: 0.004,
+                tilt: 1.2,
+                rotationSpeed: 0.007,
+            },
+            {
+                name: 'Neptune',
+                radius: 2,
+                color: 0x4169E1, // Royal Blue
+                distance: 130,
+                speed: 0.003,
+                tilt: 1.4,
+                rotationSpeed: 0.006,
+            },
+        ];
+
+        // --- Create Planets ---
+        const planets = planetsData.map(planetData => {
+            const geometry = new THREE.SphereGeometry(planetData.radius, 32, 32);
+            const material = new THREE.MeshStandardMaterial({ color: planetData.color }); // Use MeshStandardMaterial and color
+            const planet = new THREE.Mesh(geometry, material);
+            planet.position.x = planetData.distance;
+            planet.castShadow = true;
+            planet.receiveShadow = true;
+            scene.add(planet);
+
+             // Add rings for Saturn and Uranus
+            if (planetData.ringRadiusInner) {
+                const ringGeometry = new THREE.RingGeometry(planetData.ringRadiusInner, planetData.ringRadiusOuter, 64);
+                const ringMaterial = new THREE.MeshBasicMaterial({ color: planetData.ringColor, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring.rotation.x = Math.PI / 2; // Rotate the ring to be horizontal
+                planet.add(ring); // Add the ring as a child of the planet
+            }
+
+            return {
+                ...planetData,
+                mesh: planet,
+                angle: Math.random() * Math.PI * 2, // Initial random angle
+            };
+        });
+
+        // --- Camera Position ---
+        camera.position.set(0, 30, 150); // Increased Z for better view of all planets
+        camera.lookAt(scene.position);
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            planets.forEach(planet => {
+                // Orbital motion
+                planet.angle += planet.speed;
+                planet.mesh.position.x = Math.cos(planet.angle) * planet.distance;
+                planet.mesh.position.z = Math.sin(planet.angle) * planet.distance;
+
+                // Tilt and rotation
+                planet.mesh.rotation.x = planet.tilt;
+                planet.mesh.rotation.y += planet.rotationSpeed;
+            });
+
+            stars.position.z = camera.position.z - 500;
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // --- Window Resize ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Mouse Drag Controls ---
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        document.addEventListener('mousedown', (event) => {
+            isDragging = true;
+            previousMousePosition = { x: event.clientX, y: event.clientY };
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (isDragging) {
+                const deltaX = event.clientX - previousMousePosition.x;
+                const deltaY = event.clientY - previousMousePosition.y;
+
+                scene.rotation.y += deltaX * 0.005;
+                scene.rotation.x += deltaY * 0.005;
+
+                previousMousePosition = { x: event.clientX, y: event.clientY };
+            }
+        });
+
+        // --- Zoom Controls ---
+        document.addEventListener('wheel', (event) => {
+            const zoomSpeed = 5;
+            camera.position.z += event.deltaY * 0.1 * zoomSpeed;
+            camera.position.z = Math.max(50, Math.min(camera.position.z, 500)); // Clamp zoom
+            camera.lookAt(scene.position);
+        });
+
+    </script>
+</body>
+</html>
